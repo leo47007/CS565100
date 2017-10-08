@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[77]:
+# In[ ]:
 
 
 import tensorflow as tf
@@ -69,7 +69,7 @@ loss = tf.reduce_mean(tf.square(y-y_data))
 optimizer = tf.train.GradientDescentOptimizer(0.01)  #learning rate
 
 train = optimizer.minimize(loss)
-error=(y_data-y)/y_data
+error=tf.reduce_mean((y_data-y)/y_data)
 init = tf.global_variables_initializer()
 
 
@@ -85,7 +85,7 @@ with tf.Session() as sess:
     if step % 20 ==0:
       print(step,sess.run(Weights),sess.run(biases))
         
-  print(sess.run(error))
+    print(sess.run(error))
     #show_graph(tf.get_default_graph().as_graph_def())
 ###### Start TF session ######
 
