@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[ ]:
+# In[54]:
 
 
 import tensorflow as tf
@@ -52,20 +52,21 @@ housing = fetch_california_housing()
 print("Shape of dataset:", housing.data.shape)
 print("Shape of label:", housing.target.shape)
 x_data = tf.constant(housing.data,tf.float32)
-y_data = tf.constant(housing.target, tf.float32)
+y_data = tf.reshape(tf.constant(housing.target, tf.float32), [20640,1])
 ###### Implement Data Preprocess here ######
 
 ####creat tensorflow structure####
 Weights = tf.Variable(tf.random_uniform([8,1],-1.0,1.0))
 biases = tf.Variable(tf.zeros([1]))
 
-y = tf.matmul(x_data,Weights) + biases*tf.ones([20640])
+y = tf.add(tf.matmul(x_data,Weights), biases*tf.ones([20640,1]))
 
 loss = tf.reduce_mean(tf.square(y-y_data))
 
-optimizer = tf.train.GradientDescentOptimizer(0.5)  #learning rate
+optimizer = tf.train.GradientDescentOptimizer(0.1)  #learning rate
 
 train = optimizer.minimize(loss)
+error=(y_data-y)/y_data
 init = tf.initialize_all_variables()
 
 
@@ -80,24 +81,7 @@ with tf.Session() as sess:
     if step % 20 ==0:
       print(step,sess.run(Weights),sess.run(biases))
         
+  print(sess.run(error))
     show_graph(tf.get_default_graph().as_graph_def())
 ###### Start TF session ######
-
-
-# In[9]:
-
-
-housing.data.shape
-
-
-# In[21]:
-
-
-housing.target[20000,]
-
-
-# In[21]:
-
-
-housing.data.shape[1]
 
