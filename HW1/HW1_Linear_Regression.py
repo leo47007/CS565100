@@ -6,6 +6,7 @@
 
 import tensorflow as tf
 import numpy as np 
+from sklearn import preprocessing
 from sklearn.datasets import fetch_california_housing
 from IPython.display import clear_output, Image, display, HTML
 
@@ -51,7 +52,9 @@ def show_graph(graph_def, max_const_size=32):
 housing = fetch_california_housing()
 print("Shape of dataset:", housing.data.shape)
 print("Shape of label:", housing.target.shape)
-x_data = tf.constant(housing.data,tf.float32)
+x_mean = tf.reduce_mean(housing.data,0)
+x_scale = preprocessing.scale(housing.data)
+x_data = tf.constant(x_scale,tf.float32)
 y_data = tf.constant(housing.target, tf.float32)
 ###### Implement Data Preprocess here ######
 
@@ -76,25 +79,13 @@ init = tf.global_variables_initializer()
 with tf.Session() as sess:
   sess.run(init)   
   #print(sess.run(y_data))
-  #print(sess.run(error))
+  print(sess.run(error))
   for step in range(201):
     sess.run(train)
     if step % 20 ==0:
       print(step,sess.run(Weights),sess.run(biases))
         
-    #print(sess.run(error))
-    show_graph(tf.get_default_graph().as_graph_def())
+  print(sess.run(error))
+    #show_graph(tf.get_default_graph().as_graph_def())
 ###### Start TF session ######
-
-
-# In[72]:
-
-
-error
-
-
-# In[74]:
-
-
-housing.target
 
