@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[54]:
+# In[71]:
 
 
 import tensorflow as tf
@@ -75,13 +75,13 @@ init = tf.initialize_all_variables()
 ###### Start TF session ######
 with tf.Session() as sess:
   sess.run(init)   
-    
+  print(sess.run(error))
   for step in range(201):
     sess.run(train)
     if step % 20 ==0:
       print(step,sess.run(Weights),sess.run(biases))
         
-  print(sess.run(error))
+    print(sess.run(error))
     show_graph(tf.get_default_graph().as_graph_def())
 ###### Start TF session ######
 
