@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[ ]:
+# In[85]:
 
 
 import tensorflow as tf
@@ -52,24 +52,35 @@ def show_graph(graph_def, max_const_size=32):
 housing = fetch_california_housing()
 print("Shape of dataset:", housing.data.shape)
 print("Shape of label:", housing.target.shape)
-x_mean = tf.reduce_mean(housing.data,0)
-x_scale = preprocessing.scale(housing.data)
-x_data = tf.constant(x_scale,tf.float32)
-y_data = tf.constant(housing.target, tf.float32)
+
+X = np.array(housing.data)
+y = np.array(housing.target)
+X = preprocessing.scale(X)
+numData = len(housing.target)
+trainRate = 0.9
+numTrain = int(trainRate * numData)
+numData = int(numData)
+numTest = int(0.1*numData)
+
+X_train = tf.constant(X[:numTrain, :], dtype='float32')
+X_test = tf.constant(X[numTrain:, :], dtype='float32')
+y_train = tf.constant(y[:numTrain], dtype='float32')
+y_test = tf.constant(y[numTrain:], dtype='float32')
 ###### Implement Data Preprocess here ######
 
 ####creat tensorflow structure####
 Weights = tf.Variable(tf.random_uniform([8,1],-1.0,1.0))
 biases = tf.Variable(tf.zeros([1]))
 
-y = tf.add(tf.matmul(x_data,Weights), biases*tf.ones([20640,1]))
+y = tf.add(tf.matmul(X_train,Weights), biases*tf.ones([numTrain,1]))
 
-loss = tf.reduce_mean(tf.square(y-y_data))
+loss = tf.reduce_mean(tf.square(y-y_train))
 
 optimizer = tf.train.GradientDescentOptimizer(0.01)  #learning rate
 
 train = optimizer.minimize(loss)
-error=tf.reduce_mean((y_data-y)/y_data)
+y_predict = tf.add(tf.matmul(X_test, Weights), biases*tf.ones([numTest,1]))
+error=tf.reduce_mean((y_test-y_predict)/y_test)
 init = tf.global_variables_initializer()
 
 
@@ -84,7 +95,6 @@ with tf.Session() as sess:
     sess.run(train)
     if step % 20 ==0:
       print(step,sess.run(Weights),sess.run(biases))
-        
     print(sess.run(error))
     #show_graph(tf.get_default_graph().as_graph_def())
 ###### Start TF session ######
