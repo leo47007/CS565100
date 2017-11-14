@@ -26,8 +26,17 @@ n = 18
 # Data loading
 from tflearn.datasets import cifar100
 (X, Y), (testX, testY) = cifar100.load_data()
-Y = tflearn.data_utils.to_categorical(Y, 100)
+# divided into validation set, training set
+total = X.shape[0]
+X_train = X[:(total*0.8),:,:,:]
+Y_train = Y[:(total*0.8),:,:,:]
+X_valid = X[(total*0.2):,:,:,:]
+Y_valid = Y[(total*0.2):,:,:,:]
+# one-hot encoded
+Y_train = tflearn.data_utils.to_categorical(Y_train, 100)
+Y_valid = tflearn.data_utils.to_categorical(Y_valid, 100)
 testY = tflearn.data_utils.to_categorical(testY, 100)
+
 # Real-time data preprocessing
 img_prep = tflearn.ImagePreprocessing()
 img_prep.add_featurewise_zero_center(per_channel=True)
@@ -58,7 +67,7 @@ net = tflearn.regression(ful_layer, optimizer=mom,
                          loss='categorical_crossentropy')
 model = tflearn.DNN(net)
 
-"""
+
 # Training
 model = tflearn.DNN(net, checkpoint_path='model_resnet_cifar100-N',
                     best_checkpoint_path='model_resnet_cifar100_best-N',
@@ -66,7 +75,7 @@ model = tflearn.DNN(net, checkpoint_path='model_resnet_cifar100-N',
                     max_checkpoints=1, tensorboard_verbose=3,
                     clip_gradients=0.)
 
-model.fit(X, Y, n_epoch=100, validation_set=(testX, testY),
+model.fit(X_train, Y_, n_epoch=100, validation_set=(testX, testY),
           snapshot_epoch=False, snapshot_step=1000,
           show_metric=True, batch_size=64, shuffle=True,
           run_id='resnet_cifar100')
@@ -76,7 +85,7 @@ model.save("model-resnet-cifar100-110L-N")
 # Load Model
 model.load('./model_resnet_cifar100-N-57000')
 all_vars = tf.train.list_variables('./model_resnet_cifar100-N-57000')
-print('all', all_vars)
+#print('all', all_vars)
 #load_1 = tflearn.variables.get_layer_variables_by_name('block1')
 #load_1 = tf.train.load_variable('./model_resnet_cifar100-N-57000','block1')
 print('value', load_1)
@@ -87,5 +96,5 @@ score = model.evaluate(testX, testY)
 print("Score=", score)
 prediction = model.predict(testX)
 print("prediction:", prediction)
-
+"""
 
