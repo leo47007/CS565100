@@ -1,0 +1,2 @@
+model_checkpoint_path: "/media/sean/DATA/Documents/Machine_Learning/Final_Project/Xiao_Model/model-resnet-cifar100-110L-N-sean"
+all_model_checkpoint_paths: "/media/sean/DATA/Documents/Machine_Learning/Final_Project/Xiao_Model/model-resnet-cifar100-110L-N-sean"

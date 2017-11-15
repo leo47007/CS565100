@@ -1,21 +1,17 @@
 # -*- coding: utf-8 -*-
 
 """ Deep Residual Network.
-
 Applying a Deep Residual Network to CIFAR-10 Dataset classification task.
-
 References:
     - K. He, X. Zhang, S. Ren, and J. Sun. Deep Residual Learning for Image
       Recognition, 2015.
     - Learning Multiple Layers of Features from Tiny Images, A. Krizhevsky, 2009.
-
 Links:
     - [Deep Residual Network](http://arxiv.org/pdf/1512.03385.pdf)
     - [CIFAR-10 Dataset](https://www.cs.toronto.edu/~kriz/cifar.html)
-
 """
 from __future__ import division, print_function, absolute_import
-
+import numpy as np
 import tensorflow as tf
 import tflearn
 
@@ -28,10 +24,10 @@ from tflearn.datasets import cifar100
 (X, Y), (testX, testY) = cifar100.load_data()
 # divided into validation set, training set
 total = X.shape[0]
-X_train = X[:(total*0.8),:,:,:]
-Y_train = Y[:(total*0.8),:,:,:]
-X_valid = X[(total*0.2):,:,:,:]
-Y_valid = Y[(total*0.2):,:,:,:]
+X_train = X[:int(total*0.8),:,:,:]
+Y_train = Y[:int(total*0.8)]
+X_valid = X[int(total*0.2):,:,:,:]
+Y_valid = Y[int(total*0.2):]
 # one-hot encoded
 Y_train = tflearn.data_utils.to_categorical(Y_train, 100)
 Y_valid = tflearn.data_utils.to_categorical(Y_valid, 100)
@@ -61,31 +57,151 @@ act_layer = tflearn.activations.leaky_relu(nor_layer, alpha=0.1, name='act_layer
 avg_layer = tflearn.global_avg_pool(act_layer, name='avg_layer')
 
 # Regression
-ful_layer = tflearn.fully_connected(avg_layer, 100, activation='softmax', name='ful_layer')
+#ful_layer = tflearn.fully_connected(avg_layer, 100, activation='softmax', name='ful_layer')
+ful_layer = tflearn.fully_connected(avg_layer, 100, name='ful_layer')
+softmax_layer = tflearn.activations.softmax(ful_layer)
 mom = tflearn.Momentum(0.1, lr_decay=0.1, decay_step=32000, staircase=True)
-net = tflearn.regression(ful_layer, optimizer=mom,
+net = tflearn.regression(softmax_layer, optimizer=mom,
                          loss='categorical_crossentropy')
 model = tflearn.DNN(net)
 
-
+'''
 # Training
 model = tflearn.DNN(net, checkpoint_path='model_resnet_cifar100-N',
                     best_checkpoint_path='model_resnet_cifar100_best-N',
                     best_val_accuracy=70,
                     max_checkpoints=1, tensorboard_verbose=3,
                     clip_gradients=0.)
-
-model.fit(X_train, Y_, n_epoch=100, validation_set=(testX, testY),
+model.fit(X, Y, n_epoch=100, validation_set=(testX, testY),
           snapshot_epoch=False, snapshot_step=1000,
           show_metric=True, batch_size=64, shuffle=True,
           run_id='resnet_cifar100')
+model.save("model-resnet-cifar100-110L-N-sean")
+'''
+###### Secondary trainning ######
 
-model.save("model-resnet-cifar100-110L-N")
+# load pre-trained image model
+model.load('model-resnet-cifar100-110L-N-sean')
+print('Image model loaded')
+
+# load pre-trained word embedding
+with open('words500.vocab', 'r') as file:
+  vocab = file.read()
+  vocab = vocab.split('\n')
+embedding = np.load('words500.npy')
+embedding_matrix = np.matrix(embedding)
+dictionary = dict(zip(vocab, embedding))
+print('Word embedding dictionary created')
+
+# load labels of cifar100
+def unpickle(file):
+    import pickle
+    with open(file, 'rb') as fo:
+        dict = pickle.load(fo, encoding='bytes')
+    return dict
+labels_dict = unpickle('cifar-100-python/meta')
+fine_label_names = labels_dict[b'fine_label_names']
+coarse_label_names = labels_dict[b'coarse_label_names']
+
+# process images' labels and convert to vectors
+Y_train_label_position = np.argmax(Y_train, axis=1)
+Y_valid_label_position = np.argmax(Y_valid, axis=1)
+testY_label_position = np.argmax(testY, axis=1)
+
+Y_train_label = []
+Y_valid_label = []
+testY_label = []
+
+Y_train_vec = []
+Y_valid_vec = []
+testY_vec = []
+
+for position in Y_train_label_position:
+  this_name = fine_label_names[position].decode('utf-8')
+  Y_train_label.append(this_name)
+  multi_words = False
+  for i in range(len(this_name)):
+    if this_name[i] == '_':
+      multi_words = True
+      break
+  if multi_words:
+    words_list = this_name.split('_')
+    sum_vec = np.zeros(500)
+    for word in words_list:
+      sum_vec = np.add(sum_vec, dictionary[word])
+    Y_train_vec.append(sum_vec)
+  else:
+    words_list = this_name
+    Y_train_vec.append(dictionary[this_name])
+
+print('Training Set label loaded')
+
+for position in Y_valid_label_position:
+  this_name = fine_label_names[position].decode('utf-8')
+  Y_valid_label.append(this_name)
+  multi_words = False
+  for i in range(len(this_name)):
+    if this_name[i] == '_':
+      multi_words = True
+      break
+  if multi_words:
+    words_list = this_name.split('_')
+    sum_vec = np.zeros(500)
+    for word in words_list:
+      sum_vec = np.add(sum_vec, dictionary[word])
+    Y_valid_vec.append(sum_vec)
+  else:
+    words_list = this_name
+    Y_valid_vec.append(dictionary[this_name])
+
+print('Validation Set label loaded')
+
+for position in testY_label_position:
+  this_name = fine_label_names[position].decode('utf-8')
+  testY_label.append(this_name)
+  multi_words = False
+  for i in range(len(this_name)):
+    if this_name[i] == '_':
+      multi_words = True
+      break
+  if multi_words:
+    words_list = this_name.split('_')
+    sum_vec = np.zeros(500)
+    for word in words_list:
+      sum_vec = np.add(sum_vec, dictionary[word])
+    testY_vec.append(sum_vec)
+  else:
+    words_list = this_name
+    testY_vec.append(dictionary[this_name])
+
+print('Test Set label loaded')
+
+
+### build extension model
+ful_layer_II = tflearn.fully_connected(act_layer, 500, name='ful_layer_II')
+
+trueY_vec = tf.placeholder(shape=(None, 500), dtype=tf.float32)
+loss = tf.losses.hinge_loss(trueY_vec, ful_layer_II)
+mom_II = tflearn.Momentum(0.1, lr_decay=0.1, decay_step=32000, staircase=True)
+net_II = tflearn.regression(ful_layer_II, optimizer=mom_II,
+                         loss=loss)
+model_II = tflearn.DNN(net_II)
+
+# Training
+model_II = tflearn.DNN(net_II, checkpoint_path='model_DEViSE-N',
+                    best_checkpoint_path='model_DEViSE_best-N',
+                    best_val_accuracy=70,
+                    max_checkpoints=1, tensorboard_verbose=3,
+                    clip_gradients=0.)
+model.fit(X_train, Y_train, n_epoch=50, validation_set=(X_valid, Y_valid),
+          snapshot_epoch=False, snapshot_step=1000,
+          show_metric=True, batch_size=64, shuffle=True,
+          run_id='DEViSE')
+model.save("model-DEViSE-110L-N-sean")
+
 """
-# Load Model
-model.load('./model_resnet_cifar100-N-57000')
 all_vars = tf.train.list_variables('./model_resnet_cifar100-N-57000')
-#print('all', all_vars)
+print('all', all_vars)
 #load_1 = tflearn.variables.get_layer_variables_by_name('block1')
 #load_1 = tf.train.load_variable('./model_resnet_cifar100-N-57000','block1')
 print('value', load_1)
@@ -97,4 +213,3 @@ print("Score=", score)
 prediction = model.predict(testX)
 print("prediction:", prediction)
 """
-
