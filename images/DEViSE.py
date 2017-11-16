@@ -4,12 +4,23 @@ import tensorflow as tf
 import os
 import tflearn
 
+# Data loading
+from tflearn.datasets import cifar100
+(X, Y), (testX, testY) = cifar100.load_data()
+# divided into validation set, training set
+total = X.shape[0]
+X_train = X[:int(total*0.8),:,:,:]
+Y_train = Y[:int(total*0.8)]
+X_valid = X[int(total*0.8):,:,:,:]
+Y_valid = Y[int(total*0.8):]
+
 X_impred_train = np.load('X_impred_train.npy')
 X_impred_valid = np.load('X_impred_valid.npy')
 testX_impred = np.load('testX_impred.npy')
 Y_train_vec = np.load('Y_train_vec.npy')
 Y_valid_vec = np.load('Y_valid_vec.npy')
 testY_vec = np.load('testY_vec.npy')
+fine_label = np.load('fine_label_vec.npy')
 
 ### Environment settings###
 # Setting Parameters
@@ -39,6 +50,16 @@ with tf.name_scope('M'):
     b_fc1 = bias_variable([500])
     x_image_flat = tf.reshape(x, [-1, 4096])
     y_conv = tf.nn.relu(tf.matmul(x_image_flat, W_fc1) + b_fc1)
+### Similarity
+
+#calculate the inner product with each fine label
+def similarity(result, fine):
+    near_tmp = tf.matmul(tf.constant(fine, dtype='float32'), tf.transpose(result))
+    nearest = tf.argmax(near_tmp, axis=0, output_type=tf.int32)
+    return nearest
+
+with tf.name_scope('similarity'):
+    nearest = similarity(y_conv, fine_label)
 
 # Regression
 with tf.name_scope('hinge_loss'):
@@ -50,7 +71,12 @@ train_step = tf.train.AdamOptimizer(1e-4).minimize(hinge_loss)
 with tf.name_scope('avg_loss'):
     avg_loss = tf.reduce_mean(tf.cast(hinge_loss, tf.float32))
     tf.summary.scalar("avg_loss", avg_loss)
-
+# Calculating the accuracy of the model
+y_label_idx = tf.placeholder(tf.int32, shape=[None])
+correct_prediction = tf.equal(nearest, y_label_idx)
+with tf.name_scope('Accuracy'):
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    tf.summary.scalar("Accuracy", accuracy)
 
 # Saving checkpoints
 saver = tf.train.Saver()
@@ -68,7 +94,7 @@ merged = tf.summary.merge_all()
 writer = tf.summary.FileWriter(logs_path, graph = tf.get_default_graph())
 
 # Defining a function to create a mini-batch
-def next_batch(num, data, labels):
+def next_batch(num, data, labels, labels_idx):
     '''
     Return a total of `num` random samples and labels. 
     '''
@@ -77,8 +103,24 @@ def next_batch(num, data, labels):
     idx = idx[:num]
     data_shuffle = [data[ i] for i in idx]
     labels_shuffle = [labels[ i] for i in idx]
+    labels_idx_shuffle = [labels_idx[ i] for i in idx]
 
-    return np.asarray(data_shuffle), np.asarray(labels_shuffle)
+    return np.asarray(data_shuffle), np.asarray(labels_shuffle), np.asarray(labels_idx_shuffle)
+
+# Function for calculation the accuracy of validation set    
+def validation_accuracy(batch_size, images, labels, labels_idx):
+    num_images = len(images)
+    cls_pred = 0
+    i = 0
+    num_batch = 0
+    while i < num_images:
+        j = min(i + batch_size, num_images)    # j means the first id of next batch of validation set
+        feed_dict = {x: images[i:j], y_: labels[i:j], y_label_idx: labels_idx[i:j]}     # creating feed dict. to run the model for computing accuracy
+        cls_pred = cls_pred + (sess.run(accuracy, feed_dict=feed_dict))*(j-i)    # predicting the answer to the validation input
+        i = j
+
+    acc = cls_pred / num_images     # computing the accuracy
+    return acc
 
 # Initializing parameters for early stop
 global total_iterations    # Total iterations
@@ -88,18 +130,30 @@ best_validation_accuracy = 0.0    # Recent best validation accuracy
 last_improvement = 0     # last iteration with improvement
 require_improvement = 1000    # If no improvements have done within 1000 iterations, stop trainning.
 
-for i in range(20000):
-    x_batch, y_batch = next_batch(batch_size, X_impred_train, Y_train_vec)    # Loading in the next batch of trainning set
+for i in range(10000000):
+    x_batch, y_batch_vec, y_batch_idx = next_batch(batch_size, X_impred_train, Y_train_vec, Y_train)    # Loading in the next batch of trainning set
     total_iterations = i
     if i%(2 * batch_size) == 0:
-        train_loss = avg_loss.eval(feed_dict = {x: x_batch, y_: y_batch})
-        print("step %d, training loss %g"%(i, train_loss))
-        summary = sess.run(merged, feed_dict = {x: x_batch, y_: y_batch})
+        #train_loss = avg_loss.eval(feed_dict = {x: x_batch, y_: y_batch})
+        #print("step %d, training loss %g"%(i, train_loss))
+        train_accuracy = accuracy.eval(feed_dict = {x: x_batch, y_: y_batch_vec, y_label_idx: y_batch_idx})
+        print("step %d, training accuracy %g"%(i, train_accuracy))
+        acc_validation = validation_accuracy(2 * batch_size, X_impred_valid, Y_valid_vec, Y_valid)
+        if acc_validation > best_validation_accuracy:   # If recent validation accuracy is larger than the best one
+            best_validation_accuracy = acc_validation   # update the best accuracy
+            last_improvement = total_iterations         # update the id of iterations
+
+            saver.save(sess=sess, save_path=save_path)  
+            improved_str = '*'    # mark as improved
+        else:
+            improved_str = ''
+        summary = sess.run(merged, feed_dict = {x: x_batch, y_: y_batch_vec, y_label_idx: y_batch_idx})
         writer.add_summary(summary, i)
         writer.flush()
-    train_step.run(feed_dict={x: x_batch, y_: y_batch})    # Train the model
+    train_step.run(feed_dict={x: x_batch, y_: y_batch_vec, y_label_idx: y_batch_idx})    # Train the model
 
-print("test loss %g"%avg_loss.eval(feed_dict = {x: testX_impred, y_: testY_vec}))    # Test the model
+#print("test loss %g"%avg_loss.eval(feed_dict = {x: testX_impred, y_: testY_vec}))    # Test the model
+print("test accuracy %g"%accuracy.eval(feed_dict = {x: testX_impred, y_: testY_vec, y_label_idx: testY}))    # Test the model
 
 # Close session
 sess.close()
