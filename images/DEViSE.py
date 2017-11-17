@@ -21,19 +21,20 @@ Y_train_vec = np.load('Y_train_vec.npy')
 Y_valid_vec = np.load('Y_valid_vec.npy')
 testY_vec = np.load('testY_vec.npy')
 fine_label = np.load('fine_label_vec.npy')
+print(Y_train_vec)
 
 ### Environment settings###
 # Setting Parameters
 logs_path = 'TensorBoard/'
 n_features = 4096 # number of image pixels 
-batch_size = 100 # Size of a mini-batch
+batch_size = 128 # Size of a mini-batch
 
 # Launching InteractiveSession
 sess = tf.InteractiveSession()
 with tf.name_scope('Input'):
     x = tf.placeholder(tf.float32, shape=[None, 8, 8, 64])
 with tf.name_scope('Label'):
-    y_ = tf.placeholder(tf.int32, shape=[None, 500])
+    y_ = tf.placeholder(tf.float32, shape=[None, 500])
 
 # Defining weight and bias variables
 def weight_variable(shape):
@@ -75,12 +76,32 @@ with tf.name_scope('similarity'):
     nearest = similarity(y_conv, fine_label)
 
 # Regression
+def Google_Loss(labels, logits, batch_size):
 
-with tf.name_scope('hinge_loss'):
-    hinge_loss = tf.losses.hinge_loss(labels=y_, logits=y_conv)
-    tf.summary.scalar("hinge_loss", hinge_loss)
-train_step = tf.train.AdamOptimizer(1e-3).minimize(hinge_loss)
+    margin_value = tf.constant(0.1, dtype=tf.float32)
+    num_label = tf.constant(batch_size)
+    num_label_minus1 = tf.subtract(num_label, tf.constant(1))
+    one = tf.constant(1)
 
+    inner_product = tf.matmul(labels, tf.transpose(logits))
+    diag_ones = tf.cast(tf.diag(tf.ones([num_label])), dtype=tf.float32)
+    diag_mat = tf.multiply(inner_product, tf.multiply(tf.cast(num_label, dtype=tf.float32), diag_ones))
+    dist_mat = tf.subtract(inner_product, diag_mat)
+    loss_mat = tf.add(margin_value, dist_mat)
+    loss_vec = tf.reduce_sum(loss_mat, 0)
+    loss = tf.reduce_mean(tf.clip_by_value(loss_vec, clip_value_min=0, clip_value_max=999999999999))
+
+    return loss
+
+# with tf.name_scope('hinge_loss'):
+#     hinge_loss = tf.losses.hinge_loss(labels=y_, logits=y_conv)
+#     tf.summary.scalar("hinge_loss", hinge_loss)
+# train_step = tf.train.AdamOptimizer(1e-3).minimize(hinge_loss)
+
+with tf.name_scope('Google_Loss'):
+    google_loss = Google_Loss(labels=y_, logits=y_conv, batch_size=batch_size)
+    tf.summary.scalar('Google_loss', google_loss)
+train_step = tf.train.AdamOptimizer(1e-4).minimize(google_loss)
 
 
 #Calculating the average loss of the model
@@ -168,9 +189,9 @@ for i in range(10000000):
         writer.flush()
     train_step.run(feed_dict={x: x_batch, y_: y_batch_vec, y_label_idx: y_batch_idx})    # Train the model
 
-    if total_iterations - last_improvement > require_improvement: 
-        print("No improvements for more than 1000 iterations, stop trainning")
-        break  # stop trainning
+    #if total_iterations - last_improvement > require_improvement: 
+    #    print("No improvements for more than 1000 iterations, stop trainning")
+    #    break  # stop trainning
 #print("test loss %g"%avg_loss.eval(feed_dict = {x: testX_impred, y_: testY_vec}))    # Test the model
 print("test accuracy %g"%accuracy.eval(feed_dict = {x: testX_impred, y_: testY_vec, y_label_idx: testY}))    # Test the model
 
