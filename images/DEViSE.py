@@ -24,6 +24,7 @@ X_train = X[:int(total*0.8),:,:,:]
 Y_train = Y[:int(total*0.8)]
 X_valid = X[int(total*0.8):,:,:,:]
 Y_valid = Y[int(total*0.8):]
+
 '''
 
 # Load the predicted tensors and vector representations of label 
@@ -44,12 +45,14 @@ fine_label = np.load('fine_label_vec.npy').astype(np.float32)   # Vector represe
 num_label = fine_label.shape[0]
 
 
+
 ### Environment settings###
 # Setting Parameters and the path for TensorBoard
 logs_path = 'TensorBoard/'
 n_features = 64 # number of image pixels 
 batch_size = 128 # Size of a mini-batch
 epoch_num = 5000 # Epochs to train
+
 
 # Launching InteractiveSession
 sess = tf.InteractiveSession()
@@ -60,6 +63,7 @@ with tf.name_scope('Label'):
     y_ = tf.placeholder(tf.float32, shape=[None, 500])
 with tf.name_scope('label_idx'):
     y_label_idx = tf.placeholder(tf.int32, shape=[None])
+
 
 # Defining weight and bias variables
 def weight_variable(shape):
@@ -132,15 +136,19 @@ save_path = os.path.join(save_dir, 'best_validation')
 
 ### Session initialization
 sess.run(tf.global_variables_initializer())
+
 sess.run(tf.local_variables_initializer())
+
 
 # Output visualized graph
 merged = tf.summary.merge_all()
 writer = tf.summary.FileWriter(logs_path, graph = tf.get_default_graph())
 
+
 ### Definition a function to create a mini-batch
 # Return a total of `num` random samples and labels. 
 '''
+
 def next_batch(num, data, labels, labels_idx):
     idx = np.arange(0 , len(data))
     np.random.shuffle(idx)
@@ -150,10 +158,7 @@ def next_batch(num, data, labels, labels_idx):
     labels_idx_shuffle = [labels_idx[ i] for i in idx]
 
     return np.asarray(data_shuffle), np.asarray(labels_shuffle), np.asarray(labels_idx_shuffle)
-'''
-################
-### TRAINING ###
-################
+
 loss_list = []  # Store the values of training loss and validation loss
 new_epoch = False
 epoch = 0
@@ -257,6 +262,7 @@ with open("loss_list.csv", "w") as f:
 
 # Estimate the accuracy for test set
 print("test accuracy %g"%sess.run(acc_op, feed_dict = {x: testX_impred, y_: testY_vec, y_label_idx: testY, keep_prob: 1.0}))    # Test the model
+
 
 # Close session
 sess.close()
